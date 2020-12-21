@@ -32,7 +32,7 @@ import java.util.Iterator;
  *@Date:2020/12/19 14:17
  *
  */
-public class HotUrlApp {
+public class HotUrlApp1 {
     public static void main(String[] args) throws Exception {
         //获取执行环境
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -40,6 +40,7 @@ public class HotUrlApp {
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
 
         //读取文本数据创建流，转化为JavaBean。过滤。提取数据中的时间戳生成watermark
+        // SingleOutputStreamOperator<ApacheLog> apacheLogDS = env.readTextFile("input/apache.log")
         SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy:HH:mm:ss");
         SingleOutputStreamOperator<ApacheLog> apacheLogDS = env.readTextFile("input/apache.log")
                 .map(new MapFunction<String, ApacheLog>() {
@@ -127,17 +128,17 @@ public class HotUrlApp {
         }
 
         //声明集合状态
-        private ListState<UrlCount> listState;
+        private ListState<UrlCount> mapState;
 
         @Override
         public void open(Configuration parameters) throws Exception {
-            listState = getRuntimeContext().getListState(new ListStateDescriptor<UrlCount>("list-state",UrlCount.class));
+            mapState = getRuntimeContext().getListState(new ListStateDescriptor<UrlCount>("list-state",UrlCount.class));
         }
 
         @Override
         public void processElement(UrlCount value, Context ctx, Collector<String> out) throws Exception {
             //进来的数据加入状态
-            listState.add(value);
+            mapState.add(value);
 
             //注册1毫秒后的定时器
             ctx.timerService().registerEventTimeTimer(value.getWindowEnd() + 1);
@@ -151,17 +152,16 @@ public class HotUrlApp {
         public void onTimer(long timestamp, OnTimerContext ctx, Collector<String> out) throws Exception {
             if (timestamp == ctx.getCurrentKey() + 60000L){
                 //清空状态
-                listState.clear();
+                mapState.clear();
                 //返回
                 return;
             }
             //取出状态中的数据
-            Iterator<UrlCount> iterator = listState.get().iterator();
-
-            ArrayList<UrlCount> urlCounts = Lists.newArrayList(iterator);
+            Iterator<UrlCount> iterator = mapState.get().iterator();
+            ArrayList<UrlCount> entries = Lists.newArrayList(iterator);
 
             //排序
-            urlCounts.sort(new Comparator<UrlCount>() {
+            entries.sort(new Comparator<UrlCount>() {
                 @Override
                 public int compare(UrlCount o1, UrlCount o2) {
                     if (o1.getCount() > o2.getCount()){
@@ -178,9 +178,9 @@ public class HotUrlApp {
             sb.append("=========").append(new Timestamp(timestamp -1)).append("========").append("\n");
 
             //遍历输出TOPN
-            for (int i = 0; i < Math.min(topSize,urlCounts.size()); i++) {
+            for (int i = 0; i < Math.min(topSize,entries.size()); i++) {
                 //取出单条数据
-                UrlCount urlCount = urlCounts.get(i);
+                UrlCount urlCount = entries.get(i);
                 sb.append("Top: ").append(i + 1);
                 sb.append(" Url:").append(urlCount.getUrl());
                 sb.append(" Count:").append(urlCount.getCount());
@@ -188,7 +188,7 @@ public class HotUrlApp {
             }
             Thread.sleep(100);
             //清空状态
-//            listState.clear();
+            mapState.clear();
             //输出数据
             out.collect(sb.toString());
         }

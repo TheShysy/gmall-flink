@@ -7,14 +7,13 @@ import lombok.NoArgsConstructor;
 /*
  *
  *@Author:shy
- *@Date:2020/12/19 14:15
+ *@Date:2020/12/19 16:40
  *
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class UrlCount {
-    private String url;
+public class PvCount {
     private Long windowEnd;
     private Long count;
 }
