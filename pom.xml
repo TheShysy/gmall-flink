@@ -11,6 +11,8 @@
     <modules>
         <module>gmall-user-behavior</module>
         <module>gmall-network-flow</module>
+        <module>gmall-market</module>
+        <module>gmall-login-fail</module>
     </modules>
     <properties>
         <flink.version>1.10.1</flink.version>
